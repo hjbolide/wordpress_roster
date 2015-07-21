@@ -5,6 +5,7 @@
         },
         bind: function () {
             $('input#roster_save').on('click', $.proxy(this.on_save, this));
+            $('table#roster_table').floatThead();
         },
         on_save: function () {
             $.post(NS.ajax_url, {

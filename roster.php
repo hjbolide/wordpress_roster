@@ -11,11 +11,13 @@ require_once('roster_admin.php');
 */
 
 function roster_init () {
-    wp_register_script('roster_script', plugins_url('roster.js', __FILE__), array('jquery'));
+    wp_register_script('floatthead_script', plugins_url('jquery.floatThead.min.js', __FILE__), array('jquery'));
+    wp_register_script('roster_script', plugins_url('roster.js', __FILE__), array('jquery', 'floatthead_script'));
 }
 
 
 function roster_enqueue_scripts () {
+    wp_enqueue_script('floatthead_script');
     wp_enqueue_script('roster_script');
     wp_localize_script('roster_script', 'RosterAdmin', array(
         'ajax_url' => admin_url('admin-ajax.php')
@@ -30,7 +32,7 @@ function roster_bootstrap () {
 
 
 function roster_actions () {
-    add_menu_page('Roster', 'Roster', 'read', 'Roster', 'roster_bootstrap');
+    add_menu_page('Timetable', 'Timetable', 'read', 'Timetable', 'roster_bootstrap');
 }
 
 add_action('admin_init', 'roster_init');

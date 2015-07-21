@@ -6,15 +6,20 @@ class Person {
     private $categories;
 
     private $entity_cell_tpl = <<<TPL
-<td class="column-description desc">%s
-<input type="hidden" name="pid" value="%s" />
+
+<td class="column-description desc">
+  <strong>%s</strong>
+  <input type="hidden" name="pid" value="%s" />
 </td>
+
 TPL;
 
     private $weekday_cell_tpl = <<<TPL
+
 <td style="text-align: center;">
-<input type="checkbox" name="weekday_%s" value="%s" %s />
+  <input type="checkbox" name="weekday_%s" value="%s" %s />
 </td>
+
 TPL;
 
     public function __construct($ref) {
@@ -66,7 +71,11 @@ class Roster {
     private $weekdays;
 
     private $table_header_cell_tpl = <<<TPL
-<th scope="col" class="manage-column column-description" style="text-align: center;">%s</th>
+
+<th scope="col" class="manage-column column-description" style="text-align: center;">
+  %s
+</th>
+
 TPL;
 
     public function __construct ($weekdays, $people) {
@@ -75,7 +84,7 @@ TPL;
     }
 
     public function get_html () {
-        return '<table id="roster_table" class="wp-list-table widefat">' . $this->get_table_header() . $this->get_table_body() . '</table>';
+        return '<table id="roster_table" class="wp-list-table widefat striped">' . $this->get_table_header() . $this->get_table_body() . '</table>';
     }
 
     private function get_table_header () {
@@ -129,14 +138,16 @@ class RosterAdminController {
     }
 
     private function get_header () {
-        return '<h2>Roster Edit</h2>';
+        return '<h2>Timetable Edit</h2>';
     }
 
     private function get_notification_html () {
         return <<<HTML
+
 <div id="message" class="updated notice is-dismissible" style="display: none;">
   <p>Roster <strong>updated</strong>.</p>
 </div>
+
 HTML;
     }
 
@@ -151,6 +162,7 @@ HTML;
 
     private function get_submit_html () {
         $tpl = <<<HTML
+
 <div class="tablenav bottom">
   <div class="alignleft actions">
     <input type="button" id="roster_save" class="button action" value="Save">
@@ -159,6 +171,7 @@ HTML;
     <span class="displaying-num">%s roster(s)</span>
   </div>
 </div>
+
 HTML;
         return sprintf($tpl, count($this->people));
     }
@@ -166,6 +179,7 @@ HTML;
     private function get_people () {
         $people_cat = get_category_by_path('people');
         $people = get_posts(array(
+            'numberposts' => -1,
             'orderby' => 'post_name',
             'category' => $people_cat->cat_ID
         ));
