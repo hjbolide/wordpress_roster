@@ -126,14 +126,52 @@ class RosterAdminController {
     private $roster;
     private $weekdays;
     private $people;
+    private $options;
 
     public function __construct () {
+        add_action('admin_menu', array($this, 'add_page'));
+        add_action('admin_init', array($this, 'page_init'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_action('wp_ajax_save_roster', array($this, 'save_roster'));
+        $this->init();
+    }
+
+    public function init () {
+        $this->options = get_option('roster_options');
+        if (!$this->options['weekday_category']) {
+            return;
+        }
         $this->weekdays = $this->get_weekdays();
         $this->people = $this->get_people();
         $this->roster = new Roster($this->weekdays, $this->people);
     }
 
+    public function page_init () {
+        wp_register_script('floatthead_script', plugins_url('jquery.floatThead.min.js', __FILE__), array('jquery'));
+        wp_register_script('roster_script', plugins_url('roster.js', __FILE__), array('jquery', 'floatthead_script'));
+    }
+
+    public function enqueue_scripts () {
+        wp_enqueue_script('floatthead_script');
+        wp_enqueue_script('roster_script');
+        wp_localize_script('roster_script', 'RosterAdmin', array(
+            'ajax_url' => admin_url('admin-ajax.php')
+        ));
+    }
+
+    public function add_page () {
+        add_menu_page(
+            'Timetable', 'Timetable', 'read', 'timetable',
+            array($this, 'execute'));
+    }
+
     public function execute () {
+        if (!$this->options['weekday_category']) {
+?>
+<div class="wrap"><h2>Please set weekday category</h2></div>
+<?php
+            return;
+        }
         $this->output();
     }
 
@@ -165,7 +203,7 @@ HTML;
 
 <div class="tablenav bottom">
   <div class="alignleft actions">
-    <input type="button" id="roster_save" class="button action" value="Save">
+    <input type="button" id="roster_save" class="button button-primary action" value="Save timetable">
   </div>
   <div class="tablenav-pages one-page">
     <span class="displaying-num">%s roster(s)</span>
@@ -177,19 +215,22 @@ HTML;
     }
 
     private function get_people () {
-        $people_cat = get_category_by_path('people');
-        $people = get_posts(array(
+        $args = [
             'numberposts' => -1,
             'orderby' => 'post_name',
-            'category' => $people_cat->cat_ID
-        ));
+        ];
+        if ($this->options['people_category']) {
+            $people_cat = get_category_by_path($this->options['people_category']);
+            $args['category'] = $people_cat->cat_ID;
+        }
+        $people = get_posts($args);
         return array_map(function ($p) {
             return new Person($p);
         }, $people);
     }
 
     private function get_weekdays () {
-        $weekdays_cat = get_category_by_path('weekdays');
+        $weekdays_cat = get_category_by_path($this->options['weekday_category']);
         return array_map(
             function ($t) {
                 return get_category($t);
@@ -198,7 +239,12 @@ HTML;
     }
 
     public function save_roster ($roster) {
+        $roster = str_replace('\"', '"', $_POST['roster']);
+        $roster = json_decode($roster, true);
         $this->roster->save($roster);
+        ob_clean();
+        echo "success";
+        wp_die();
     }
 }
 
