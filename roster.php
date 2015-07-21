@@ -1,6 +1,7 @@
 <?php
 
 require_once('roster_admin.php');
+require_once('roster_option.php');
 
 /*
     Plugin Name: Roster
@@ -31,8 +32,15 @@ function roster_bootstrap () {
 }
 
 
+function roster_option () {
+    $option = new RosterOptionController();
+    $option->output();
+}
+
+
 function roster_actions () {
-    add_menu_page('Timetable', 'Timetable', 'read', 'Timetable', 'roster_bootstrap');
+    add_menu_page('Timetable', 'Timetable', 'read', 'timetable', 'roster_bootstrap');
+    add_options_page('Settings Admin', 'Timetable', 'manage_options', 'timetable_option', 'roster_option');
 }
 
 add_action('admin_init', 'roster_init');
