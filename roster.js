@@ -29,7 +29,7 @@
             return data;
         },
         on_save_finished: function (response) {
-            $('div#message').fadeIn(500).delay(3000).fadeOut(500);
+            $('div#message').slideDown(500).delay(3000).fadeOut(500);
         }
     });
 
