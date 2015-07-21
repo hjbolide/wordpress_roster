@@ -5,7 +5,9 @@
         },
         bind: function () {
             $('input#roster_save').on('click', $.proxy(this.on_save, this));
-            $('table#roster_table').floatThead();
+            $('table#roster_table').floatThead({
+                scrollingTop: 32
+            });
         },
         on_save: function () {
             $.post(NS.ajax_url, {
@@ -27,7 +29,7 @@
             return data;
         },
         on_save_finished: function (response) {
-            $('div#message').fadeIn(500).delay(5000).fadeOut(500);
+            $('div#message').fadeIn(500).delay(3000).fadeOut(500);
         }
     });
 

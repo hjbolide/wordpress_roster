@@ -1,5 +1,7 @@
 <?php
 
+require_once('roster_audittrail.php');
+
 class Person {
 
     private $reference;
@@ -127,28 +129,30 @@ class RosterAdminController {
     private $weekdays;
     private $people;
     private $options;
+    private $audit;
 
     public function __construct () {
         add_action('admin_menu', array($this, 'add_page'));
         add_action('admin_init', array($this, 'page_init'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('wp_ajax_save_roster', array($this, 'save_roster'));
-        $this->init();
     }
 
     public function init () {
         $this->options = get_option('roster_options');
         if (!$this->options['weekday_category']) {
-            return;
+            $this->options['weekday_category'] = 'timetable';
         }
         $this->weekdays = $this->get_weekdays();
         $this->people = $this->get_people();
         $this->roster = new Roster($this->weekdays, $this->people);
+        $this->audit = new RosterAuditTrail();
     }
 
     public function page_init () {
         wp_register_script('floatthead_script', plugins_url('jquery.floatThead.min.js', __FILE__), array('jquery'));
         wp_register_script('roster_script', plugins_url('roster.js', __FILE__), array('jquery', 'floatthead_script'));
+        $this->init();
     }
 
     public function enqueue_scripts () {
@@ -182,7 +186,7 @@ class RosterAdminController {
     private function get_notification_html () {
         return <<<HTML
 
-<div id="message" class="updated notice is-dismissible" style="display: none;">
+<div id="message" class="updated notice" style="display: none; position: fixed; top: 100px; z-index: 99999;">
   <p>Roster <strong>updated</strong>.</p>
 </div>
 
@@ -204,6 +208,8 @@ HTML;
 <div class="tablenav bottom">
   <div class="alignleft actions">
     <input type="button" id="roster_save" class="button button-primary action" value="Save timetable">
+    &nbsp;
+    <span style="line-height: 35px;"><em>Last modified: %s</em></span>
   </div>
   <div class="tablenav-pages one-page">
     <span class="displaying-num">%s roster(s)</span>
@@ -211,7 +217,12 @@ HTML;
 </div>
 
 HTML;
-        return sprintf($tpl, count($this->people));
+        $audit = $this->audit->get_latest_audit();
+        return sprintf(
+            $tpl,
+            date_i18n('Y/m/d g:i:s', strtotime($audit->modified_at), 0),
+            count($this->people)
+        );
     }
 
     private function get_people () {
@@ -242,7 +253,7 @@ HTML;
         $roster = str_replace('\"', '"', $_POST['roster']);
         $roster = json_decode($roster, true);
         $this->roster->save($roster);
-        ob_clean();
+        $this->audit->audit();
         echo "success";
         wp_die();
     }
