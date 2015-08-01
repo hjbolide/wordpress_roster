@@ -8,39 +8,56 @@ require_once('roster_option.php');
     Plugin URI: http://www.google.com
     Description: Plugin for roster
     Author: CH
-    Version: 0.1
+    Version: 0.2
 */
 
 global $ver;
-$ver = '0.1';
-
-global $table;
-$table = 'roster_audit';
+$ver = '0.2';
 
 function roster_install () {
     global $wpdb;
-    global $ver;
-    global $table;
     $installed_ver = get_option('roster_db_version');
-    if ($installed_ver != $ver) {
-        $table_name = $wpdb->prefix . $table;
-        $charset = $wpdb->get_charset_collate();
+    $prefix = $wpdb->prefix;
+    $charset = $wpdb->get_charset_collate();
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    if (!$installed_ver) {
+        $table_name = $prefix . 'roster_audit';
         $sql = "
 CREATE TABLE $table_name (
-id mediumint(9) NOT NULL AUTO_INCREMENT,
+ID BIGINT UNSIGNED PRIMARY KEY NOT NULL AUTO_INCREMENT,
 modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 UNIQUE KEY id (id)
 ) $charset
 ";
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
-        update_option('roster_db_version', $ver);
+        update_option('roster_db_version', '0.1');
     }
 }
 
+function ngroster_install () {
+    global $wpdb, $ver;
+    $installed_ver = get_option('roster_db_version');
+    $prefix = $wpdb->prefix;
+    if ($installed_ver < '0.2') {
+        $table_name = $prefix . 'ngroster';
+        $post_table = $prefix . 'posts';
+        $sql = "
+        CREATE TABLE $table_name (
+        ID BIGINT UNSIGNED PRIMARY KEY NOT NULL AUTO_INCREMENT,
+        pid BIGINT UNSIGNED NOT NULL,
+        roster_date DATE NOT NULL,
+        FOREIGN KEY (pid) REFERENCES $post_table(ID)
+        )
+        ";
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+    }
+    update_option('roster_db_version', $ver);
+}
+
 register_activation_hook(__FILE__, 'roster_install');
+add_action('plugins_loaded', 'ngroster_install');
 
-$controller = new RosterAdminController();
+$controller = new NGRosterAdminController();
 $options = new RosterOptionController();
-
-?>

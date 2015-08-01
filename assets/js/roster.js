@@ -28,7 +28,7 @@
             });
             return data;
         },
-        on_save_finished: function (response) {
+        on_save_finished: function () {
             $('div#message').slideDown(500).delay(3000).fadeOut(500);
         }
     });
