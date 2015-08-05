@@ -2,13 +2,28 @@
 
 require_once('roster_audittrail.php');
 
+global $week_mapping;
+$week_mapping = array(
+    'MONDAY' => 0,
+    'TUESDAY' => 1,
+    'WEDNESDAY' => 2,
+    'THURSDAY' => 3,
+    'FRIDAY' => 4,
+    'SATURDAY' => 5,
+    'SUNDAY' => 6
+);
 
-function __LOG ($message, $cease=false) {
+
+function __LOG ($message, $cease=false, $dump=false) {
     if (!WP_DEBUG) {
         return;
     }
     echo "<pre>";
-    print_r($message);
+    if ($dump) {
+        var_dump($message);
+    } else {
+        print_r($message);
+    }
     echo "</pre>";
     if ($cease) {
         wp_die();
@@ -56,12 +71,12 @@ TPL;
 
     private function get_roster_html ($weekdays) {
         $html = '';
-        foreach ($weekdays as $w) {
+        foreach ($weekdays as $weekday) {
             $checked = '';
-            if (in_array($w->term_id, $this->categories)) {
+            if (in_array($weekday->term_id, $this->categories)) {
                 $checked = 'checked="checked"';
             }
-            $html .= sprintf($this->weekday_cell_tpl, $w->term_id, $w->term_id, $checked);
+            $html .= sprintf($this->weekday_cell_tpl, $weekday->term_id, $weekday->term_id, $checked);
         }
         return $html;
     }
@@ -78,9 +93,9 @@ TPL;
         $categories = array_keys(array_filter($weekdays, function ($w) {
             return $w;
         }));
-        foreach ($this->categories as $c) {
-            if (!array_key_exists($c, $weekdays)) {
-                array_push($categories, $c);
+        foreach ($this->categories as $cat) {
+            if (!array_key_exists($cat, $weekdays)) {
+                array_push($categories, $cat);
             }
         }
         wp_set_post_categories($this->reference->ID, $categories, false);
@@ -138,8 +153,8 @@ TPL;
      */
     private function get_people_in_assoc_array () {
         $result = array();
-        foreach ($this->people as $p) {
-            $result[$p->get_id()] = $p;
+        foreach ($this->people as $person) {
+            $result[$person->get_id()] = $person;
         }
         return $result;
     }
@@ -188,13 +203,17 @@ class RosterAdminController {
         add_action('admin_menu', array($this, 'add_page'));
         add_action('admin_init', array($this, 'page_init'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+        $this->add_ajax_action();
+    }
+
+    protected function add_ajax_action () {
         add_action('wp_ajax_save_roster', array($this, 'save_roster'));
     }
 
     public function init () {
         $this->options = get_option('roster_options');
         if (!$this->options['weekday_category']) {
-            $this->options['weekday_category'] = 'weekdays';
+            $this->options['weekday_category'] = 'timetable';
         }
         $this->weekdays = $this->get_weekdays();
         $this->people_init();
@@ -222,8 +241,8 @@ class RosterAdminController {
 
     public function add_page () {
         add_menu_page(
-            'Timetable', 'Timetable', 'read', 'timetable',
-            array($this, 'execute'));
+            'Timetable', 'Timetable', 'manage_options', 'timetable');
+        add_submenu_page('timetable', 'By People', 'By People', 'manage_options', 'timetable', array($this, 'execute'));
     }
 
     public function execute () {
@@ -285,7 +304,8 @@ HTML;
     protected function people_init () {
         $args = [
             'numberposts' => -1,
-            'orderby' => 'post_name',
+            'orderby' => 'title',
+            'order' => 'ASC'
         ];
         if ($this->options['people_category']) {
             $people_cat = get_category_by_path($this->options['people_category']);
@@ -306,20 +326,30 @@ HTML;
     }
 
     protected function get_weekdays () {
+        global $week_mapping;
         $weekdays_cat = get_category_by_path($this->options['weekday_category']);
-        return array_map(
+        $weekdays = array_map(
             function ($t) {
                 return get_category($t);
             },
             get_term_children($weekdays_cat->term_id, $weekdays_cat->taxonomy));
+        $result = [];
+        foreach ($weekdays as $weekday) {
+            $index = $week_mapping[strtoupper($weekday->cat_name)];
+            $result[$index] = $weekday;
+        }
+        ksort($result);
+        return $result;
     }
 
     public function save_roster () {
         $roster = str_replace('\"', '"', $_POST['roster']);
         $roster = json_decode($roster, true);
         $this->roster->save($roster);
+        var_dump($this->roster);
         $this->audit->audit();
         echo "success";
+        ob_flush();
         wp_die();
     }
 }
@@ -343,6 +373,31 @@ class NGWeekday { // NGWeekday
 
 class NGPerson extends Person {
 
+    private function is_checked($cat) {
+        global $week_mapping;
+        $today = new DateTime();
+        $date_str = $today->format('Y-m-d');
+        global $wpdb;
+        $table = $wpdb->prefix . 'ngroster';
+        $pid = $this->reference->ID;
+        $results = $wpdb->get_results(
+            "
+            SELECT roster_date, working
+            FROM $table
+            WHERE pid=$pid
+            AND roster_date >= '$date_str'
+            "
+        );
+
+        foreach ($results as $r) {
+            $w = DateTime::createFromFormat('Y-m-d', $r->roster_date)->format('N') - 1;
+            if ($w == $week_mapping[strtoupper($cat->cat_name)]) {
+                return boolval($r->working);
+            }
+        }
+        return in_array($cat->term_id, $this->categories);
+    }
+
     public function get_html($cat) {
         $html = <<<HTML
 <div class="girlgrid" data-edik-elem="%s" data-edik-elem-type="people">
@@ -354,7 +409,7 @@ class NGPerson extends Person {
   </div>
 </div>
 HTML;
-        $is_checked = in_array($cat->term_id, $this->categories);
+        $is_checked = $this->is_checked($cat);
         $thumbnail_id = get_post_thumbnail_id($this->reference->ID);
         $thumbnail_url = wp_get_attachment_url($thumbnail_id);
         $id = $this->reference->ID;
@@ -387,7 +442,7 @@ class NGRoster extends Roster { // NGRoster
             '  <ul class="outer-border">'
         ];
         for ($i = 0; $i < self::NUMBER_OF_DAYS-1; $i += 1) {
-            $today->add(new DateInterval('P' . $i . 'D'));
+            $today->add(new DateInterval('P1D'));
             $html[] = $this->get_weekday_html($today, $i==0);
         }
         $html[] = '</ul></div>';
@@ -397,12 +452,13 @@ class NGRoster extends Roster { // NGRoster
 
     /**
      * @param DateTime $today
+     * @param Boolean $open
      * @return string
      */
     protected function get_weekday_html ($today, $open) {
         $title = $today->format("l (j/M/Y)");
-        $day_of_week = $today->format("w");
-        $cat = $this->weekdays[$day_of_week];
+        $day_of_week = $today->format("N");
+        $cat = $this->weekdays[$day_of_week - 1];
         $html = [
             '<li class="control-section accordion-section '
               . ($open ? 'open' : '')
@@ -436,6 +492,38 @@ class NGRoster extends Roster { // NGRoster
         }
         return implode("\n", $html);
     }
+
+    public function save($roster) {
+        global $wpdb;
+        $prefix = $wpdb->prefix;
+        $table = $prefix . 'ngroster';
+
+        $wpdb->query('START TRANSACTION');
+        foreach ($roster as $p => $weekdays) {
+            foreach ($weekdays as $w => $working) {
+                $pid = intval($p);
+                $date = new DateTime();
+                $date->setTimestamp($w);
+                $date_str = $date->format('Y-m-d');
+                if (!$wpdb->get_row("SELECT 1 FROM $table WHERE pid=$pid AND roster_date='$date_str'")) {
+                    $wpdb->insert(
+                        $table,
+                        array(
+                            'pid' => intval($p),
+                            'roster_date' => $date->format('Y-m-d'),
+                            'working' => $working
+                        ));
+                } else {
+                    $wpdb->update(
+                        $table,
+                        array('working' => $working),
+                        array('pid' => $pid, 'roster_date' => $date_str));
+                }
+            }
+        }
+        $wpdb->query('COMMIT');
+    }
+
 }
 
 
@@ -452,7 +540,6 @@ class NGRosterAdminController extends RosterAdminController {
         $this->init();
     }
 
-
     public function enqueue_scripts () {
         wp_enqueue_style('ngroster_style');
         wp_enqueue_script('ngroster_script');
@@ -462,7 +549,6 @@ class NGRosterAdminController extends RosterAdminController {
         ));
     }
 
-
     /**
      * @param WP_Post[] $people
      * @return NGPerson[]
@@ -471,6 +557,27 @@ class NGRosterAdminController extends RosterAdminController {
         return array_map(function ($p) {
             return new NGPerson($p);
         }, $people);
+    }
+
+    public function add_page()
+    {
+        add_submenu_page('timetable', 'By Date', 'By Date', 'read', 'by-date', array($this, 'execute'));
+    }
+
+    public function save_ngroster () {
+        $roster = str_replace('\"', '"', $_POST['roster']);
+        $roster = json_decode($roster, true);
+        $this->roster->save($roster);
+        var_dump($this->roster);
+        $this->audit->audit();
+        echo "success";
+        ob_flush();
+        wp_die();
+    }
+
+    protected function add_ajax_action()
+    {
+        add_action('wp_ajax_save_ngroster', array($this, 'save_ngroster'));
     }
 
 

@@ -47,6 +47,7 @@ function ngroster_install () {
         ID BIGINT UNSIGNED PRIMARY KEY NOT NULL AUTO_INCREMENT,
         pid BIGINT UNSIGNED NOT NULL,
         roster_date DATE NOT NULL,
+        working TINYINT(1) NOT NULL,
         FOREIGN KEY (pid) REFERENCES $post_table(ID)
         )
         ";
@@ -59,5 +60,6 @@ function ngroster_install () {
 register_activation_hook(__FILE__, 'roster_install');
 add_action('plugins_loaded', 'ngroster_install');
 
-$controller = new NGRosterAdminController();
-$options = new RosterOptionController();
+new RosterAdminController();
+new NGRosterAdminController();
+new RosterOptionController();

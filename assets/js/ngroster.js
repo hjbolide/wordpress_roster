@@ -5,6 +5,20 @@
             this.roster = {};
         },
         bind: function () {
+            this._bind_on_search_person();
+            this._bind_on_select_person();
+            this._bind_on_save();
+        },
+        _bind_on_save: function () {
+            $('input#roster_save').on('click', $.proxy(function () {
+                console.log(this.roster);
+                $.post(NS.ajax_url, {
+                    roster: JSON.stringify(this.roster),
+                    action: 'save_ngroster'
+                }, $.proxy(this.on_save_finished, this));
+            }, this));
+        },
+        _bind_on_search_person: function () {
             $('input[data-edik-elem="search"]').on('keyup', function (e) {
                 var $target = $(e.target),
                     $people = $target.closest('article').find('[data-edik-elem="people-grid"]'),
@@ -37,28 +51,30 @@
                     });
                 }
             });
-            this._bind_on_select_person();
         },
         _bind_on_select_person: function () {
-            $('input[type="checkbox"][data-edik-elem-type="person"]').on('change', function (e) {
+            $('input[type="checkbox"][data-edik-elem-type="person"]').on('change', $.proxy(function (e) {
                 var $target = $(e.target),
                     elem_id = $target.data('edik-elem'),
-                    elem_title = $target.data('edik-elem-title');
+                    elem_title = $target.data('edik-elem-title'),
+                    date = $target.closest('li').attr('id'),
+                    checked = $target.prop('checked');
+
+                if (!(elem_title in this.roster)) {
+                    this.roster[elem_title] = {};
+                }
+                this.roster[elem_title][date] = checked;
+
                 if ($target.parent()[0].hasAttribute('cloned')) {
                     $target
                         .closest('article')
                         .find('[data-edik-elem="' + elem_id + '"][data-edik-elem-title="' + elem_title + '"]')
-                        .prop('checked', $target.prop('checked'));
+                        .prop('checked', checked);
                 }
-            });
+            }, this));
         },
-        on_save: function () {
-            $.post(NS.ajax_url, {
-                roster: JSON.stringify(this.roster),
-                action: 'save_roster'
-            }, $.proxy(this.on_save_finished, this));
-        },
-        on_save_finished: function () {
+        on_save_finished: function (response) {
+            this.roster = {};
             $('div#message').slideDown(500).delay(3000).fadeOut(500);
         }
     });
