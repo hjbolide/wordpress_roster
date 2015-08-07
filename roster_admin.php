@@ -400,7 +400,7 @@ class NGPerson extends Person {
 
     public function get_html($cat) {
         $html = <<<HTML
-<div class="girlgrid" data-edik-elem="%s" data-edik-elem-type="people">
+<div class="person-grid" data-edik-elem="%s" data-edik-elem-type="people">
   <input type="checkbox" data-edik-elem="%s" data-edik-elem-title="%s" data-edik-elem-type="person" class="on" %s/>
   <img data-edik-elem="overlay" class="overlay" src="%s" />
   <img data-edik-elem="gthumb" class="gthumb" src="%s">

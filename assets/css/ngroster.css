@@ -17,7 +17,7 @@
     width: 14%;
 }
 
-.girlgrid {
+.person-grid {
     float: left;
     text-align: center;
     width: 90px;
@@ -42,7 +42,7 @@ input:checked ~ .gthumb {
 
 }
 
-.girlgrid input {
+.person-grid input {
     display: block !important;
     float: left;
     height: 112px;
@@ -58,7 +58,7 @@ input:checked ~ .gthumb {
     cursor: pointer;
 }
 
-.girlgrid button {
+.person-grid button {
     width: 16px;
     height: 16px;
 }

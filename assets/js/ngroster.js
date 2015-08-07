@@ -8,6 +8,17 @@
             this._bind_on_search_person();
             this._bind_on_select_person();
             this._bind_on_save();
+            this._on_bind_finished();
+        },
+        _on_bind_finished: function () {
+            $('article').each(function (i, m) {
+                var $this = $(m),
+                    $people_grid = $this.find('div[data-edik-elem="people-grid"]');
+                $people_grid.find('input:checked[type="checkbox"][data-edik-elem-type="person"]')
+                    .closest('div.person-grid')
+                    .detach()
+                    .prependTo($people_grid);
+            });
         },
         _bind_on_save: function () {
             $('input#roster_save').on('click', $.proxy(function () {
@@ -46,8 +57,9 @@
 
                 if (match) {
                     $.each(match, function (i, $e) {
-                        $people.prepend($e.clone({withDataAndEvents: true}).attr('cloned', 'cloned'));
+                        var $new_e = $e.clone({withDataAndEvents: true}).attr('cloned', 'cloned').prependTo($people).hide();
                         $e.hide();
+                        $new_e.fadeIn(600);
                     });
                 }
             });
@@ -57,6 +69,7 @@
                 var $target = $(e.target),
                     elem_id = $target.data('edik-elem'),
                     elem_title = $target.data('edik-elem-title'),
+                    $people_grid = $target.closest('div[data-edik-elem="people-grid"]'),
                     date = $target.closest('li').attr('id'),
                     checked = $target.prop('checked');
 
@@ -70,6 +83,13 @@
                         .closest('article')
                         .find('[data-edik-elem="' + elem_id + '"][data-edik-elem-title="' + elem_title + '"]')
                         .prop('checked', checked);
+                }
+
+                var $person_grid = $target.closest('div.person-grid').detach().hide();
+                if (checked) {
+                    $person_grid.prependTo($people_grid).fadeIn(1000);
+                } else {
+                    $person_grid.appendTo($people_grid).fadeIn(1000);
                 }
             }, this));
         },
