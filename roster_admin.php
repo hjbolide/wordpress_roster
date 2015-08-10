@@ -441,8 +441,10 @@ class NGRoster extends Roster { // NGRoster
             '<div id="side-sortables" class="accordion-container">',
             '  <ul class="outer-border">'
         ];
-        for ($i = 0; $i < self::NUMBER_OF_DAYS-1; $i += 1) {
-            $today->add(new DateInterval('P1D'));
+        for ($i = 0; $i < self::NUMBER_OF_DAYS; $i += 1) {
+            if ($i != 0) {
+                $today->add(new DateInterval('P1D'));
+            }
             $html[] = $this->get_weekday_html($today, $i==0);
         }
         $html[] = '</ul></div>';

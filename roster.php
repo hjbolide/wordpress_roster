@@ -2,6 +2,7 @@
 
 require_once('roster_admin.php');
 require_once('roster_option.php');
+require_once('roster_widget.php');
 
 /*
     Plugin Name: Roster
@@ -63,3 +64,4 @@ add_action('plugins_loaded', 'ngroster_install');
 new RosterAdminController();
 new NGRosterAdminController();
 new RosterOptionController();
+new RosterWidgetController();
