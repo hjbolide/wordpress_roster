@@ -43,46 +43,44 @@ class Person {
      */
     protected $categories;
 
-    private $entity_cell_tpl = <<<TPL
-
-<td class="column-description desc">
-  <strong>%s</strong>
-  <input type="hidden" name="pid" value="%s" />
-</td>
-
-TPL;
-
-    private $weekday_cell_tpl = <<<TPL
-
-<td style="text-align: center;">
-  <input type="checkbox" name="weekday_%s" value="%s" %s />
-</td>
-
-TPL;
-
     public function __construct($ref) {
         $this->reference = $ref;
         $this->categories = wp_get_post_categories($this->reference->ID);
     }
 
-    public function get_html ($weekdays) {
-        return '<tr>' . $this->get_entity_cell_html() . $this->get_roster_html($weekdays) . '</tr>';
+    public function html ($weekdays) {
+    ?>
+        <tr>
+            <?php $this->entity_cell_html(); ?>
+            <?php $this->roster_html($weekdays); ?>
+        </tr>
+    <?php
     }
 
-    private function get_roster_html ($weekdays) {
-        $html = '';
+    private function roster_html ($weekdays) {
         foreach ($weekdays as $weekday) {
             $checked = '';
             if (in_array($weekday->term_id, $this->categories)) {
                 $checked = 'checked="checked"';
             }
-            $html .= sprintf($this->weekday_cell_tpl, $weekday->term_id, $weekday->term_id, $checked);
+    ?>
+            <td style="text-align: center;">
+                <input type="checkbox"
+                       name="weekday_<?= $weekday->term_id ?>"
+                       value="<?= $weekday->term_id ?>"
+                       <?= $checked ?> />
+            </td>
+    <?php
         }
-        return $html;
     }
 
-    private function get_entity_cell_html () {
-        return sprintf($this->entity_cell_tpl, $this->reference->post_title, $this->reference->ID);
+    private function entity_cell_html () {
+    ?>
+        <td class="column-description desc">
+            <strong><?= $this->reference->post_title; ?></strong>
+            <input type="hidden" name="pid" value="<?= $this->reference->ID ?>" />
+        </td>
+    <?php
     }
 
     public function get_id () {
@@ -115,37 +113,43 @@ class Roster {
      */
     protected $weekdays; // weekday categories
 
-    private $table_header_cell_tpl = <<<TPL
-
-<th scope="col" class="manage-column column-description" style="text-align: center;">
-  %s
-</th>
-
-TPL;
-
     public function __construct ($weekdays, $people) {
         $this->weekdays = $weekdays;
         $this->people = $people;
     }
 
-    public function get_html () {
-        return '<table id="roster_table" class="wp-list-table widefat striped">' . $this->get_table_header() . $this->get_table_body() . '</table>';
+    public function html () {
+    ?>
+        <table id="roster_table" class="wp-list-table widefat striped">
+            <?php $this->table_header(); ?>
+            <?php $this->table_body(); ?>
+        </table>
+    <?php
     }
 
-    private function get_table_header () {
-        $html = '<thead><tr><th></th>';
-        foreach ($this->weekdays as $w) {
-            $html .= sprintf($this->table_header_cell_tpl, $w->name);
-        }
-        return $html.'</tr></thead>';
+    private function table_header () {
+    ?>
+        <thead>
+            <tr>
+                <th></th>
+                <?php foreach ($this->weekdays as $w) { ?>
+                <th scope="col" class="manage-column column-description" style="text-align: center;">
+                <?= $w->name ?>
+                </th>
+                <?php } ?>
+            </tr>
+        </thead>
+    <?php
     }
 
-    private function get_table_body () {
-        $html = '<tbody>';
-        foreach ($this->people as $p) {
-            $html .= $p->get_html($this->weekdays);
-        }
-        return $html.'</tbody>';
+    private function table_body () {
+    ?>
+        <tbody>
+    <?php foreach ($this->people as $p) {
+        $p->html($this->weekdays);
+    } ?>
+        </tbody>
+    <?php
     }
 
     /**
@@ -247,58 +251,56 @@ class RosterAdminController {
 
     public function execute () {
         if (!$this->options['weekday_category']) {
-?>
-<div class="wrap"><h2>Please set weekday category</h2></div>
-<?php
+    ?>
+        <div class="wrap"><h2>Please set weekday category</h2></div>
+    <?php
             return;
         }
         $this->output();
     }
 
-    protected function get_header () {
-        return '<h2>Timetable Edit</h2>';
+    protected function header () {
+    ?>
+        <h2>Timetable Edit</h2>
+    <?php
     }
 
-    protected function get_notification_html () {
-        return <<<HTML
-
-<div id="message" class="updated notice" style="display: none; position: fixed; top: 100px; z-index: 99999;">
-  <p>Roster <strong>updated</strong>.</p>
-</div>
-
-HTML;
+    protected function notification () {
+    ?>
+        <div id="message" class="updated notice" style="display: none; position: fixed; top: 100px; z-index: 99999;">
+            <p>Roster <strong>updated</strong>.</p>
+        </div>
+    <?php
     }
 
     protected function output () {
-        echo '<div class="wrap">'
-            . $this->get_header()
-            . $this->get_notification_html()
-            . $this->roster->get_html()
-            . $this->get_submit_html()
-            . '</div>';
+    ?>
+        <div class="wrap">
+            <?php $this->header(); ?>
+            <?php $this->notification(); ?>
+            <?php $this->roster->html(); ?>
+            <?php $this->submit_html(); ?>
+        </div>
+    <?php
     }
 
-    protected function get_submit_html () {
-        $tpl = <<<HTML
-
-<div class="tablenav bottom">
-  <div class="alignleft actions">
-    <input type="button" id="roster_save" class="button button-primary action" value="Save timetable">
-    &nbsp;
-    <span style="line-height: 35px;"><em>Last modified: %s</em></span>
-  </div>
-  <div class="tablenav-pages one-page">
-    <span class="displaying-num">%s roster(s)</span>
-  </div>
-</div>
-
-HTML;
+    protected function submit_html () {
         $audit = $this->audit->get_latest_audit();
-        return sprintf(
-            $tpl,
-            date_i18n('Y/m/d g:i:s', strtotime($audit->modified_at), 0),
-            count($this->people)
-        );
+    ?>
+
+        <div class="tablenav bottom">
+          <div class="alignleft actions">
+            <input type="button" id="roster_save" class="button button-primary action" value="Save timetable">
+            &nbsp;
+            <span style="line-height: 35px;">
+                <em>Last modified: <?= date_i18n('Y/m/d g:i:s', strtotime($audit->modified_at), 0) ?></em>
+            </span>
+          </div>
+          <div class="tablenav-pages one-page">
+            <span class="displaying-num"><?= count($this->people) ?> roster(s)</span>
+          </div>
+        </div>
+    <?php
     }
 
     protected function people_init () {
@@ -366,7 +368,7 @@ class NGWeekday { // NGWeekday
         $this->people = $people;
     }
 
-    public function get_html () {
+    public function html () {
     }
 }
 
@@ -398,17 +400,7 @@ class NGPerson extends Person {
         return in_array($cat->term_id, $this->categories);
     }
 
-    public function get_html($cat) {
-        $html = <<<HTML
-<div class="person-grid" data-edik-elem="%s" data-edik-elem-type="people">
-  <input type="checkbox" data-edik-elem="%s" data-edik-elem-title="%s" data-edik-elem-type="person" class="on" %s/>
-  <img data-edik-elem="overlay" class="overlay" src="%s" />
-  <img data-edik-elem="gthumb" class="gthumb" src="%s">
-  <div data-edik-elem="name" class="name" >
-    <h4>%s</h4>
-  </div>
-</div>
-HTML;
+    public function html($cat) {
         $is_checked = $this->is_checked($cat);
         $thumbnail_id = get_post_thumbnail_id($this->reference->ID);
         $thumbnail_url = wp_get_attachment_url($thumbnail_id);
@@ -417,16 +409,21 @@ HTML;
         if (!$thumbnail_url) {
             $thumbnail_url = plugins_url('assets/images/no_photo.jpg', __FILE__);
         }
-        return sprintf(
-            $html,
-            $id . ':' . esc_attr($title),
-            $title,
-            $id,
-            $is_checked ? 'checked="checked"' : '',
-            plugins_url('assets/images/on.png', __FILE__),
-            $thumbnail_url,
-            $this->reference->post_title
-        );
+    ?>
+        <div class="person-grid" data-edik-elem="<?= $id . ':' . esc_attr($title) ?>" data-edik-elem-type="people">
+          <input type="checkbox" data-edik-elem="<?= $title ?>"
+                 data-edik-elem-title="<?= $id ?>"
+                 data-edik-elem-type="person" class="on"
+                 <?= $is_checked ? 'checked="checked"' : '' ?>/>
+          <img data-edik-elem="overlay" class="overlay"
+               src="<?= plugins_url('assets/images/on.png', __FILE__) ?>" />
+          <img data-edik-elem="gthumb" class="gthumb"
+               src="<?= $thumbnail_url ?>">
+          <div data-edik-elem="name" class="name" >
+            <h4><?= $this->reference->post_title ?></h4>
+          </div>
+        </div>
+    <?php
     }
 }
 
@@ -435,21 +432,22 @@ class NGRoster extends Roster { // NGRoster
 
     const NUMBER_OF_DAYS = 7;
 
-    public function get_html() {
-        $today = new DateTime();
-        $html = [
-            '<div id="side-sortables" class="accordion-container">',
-            '  <ul class="outer-border">'
-        ];
-        for ($i = 0; $i < self::NUMBER_OF_DAYS; $i += 1) {
-            if ($i != 0) {
-                $today->add(new DateInterval('P1D'));
-            }
-            $html[] = $this->get_weekday_html($today, $i==0);
-        }
-        $html[] = '</ul></div>';
-
-        return implode("\n", $html);
+    public function html() {
+    ?>
+        <div id="side-sortables" class="accordion-container">
+            <ul class="outer-border">
+                <?php
+                    $today = new DateTime();
+                    for ($i = 0; $i < self::NUMBER_OF_DAYS; $i += 1) {
+                        if ($i != 0) {
+                            $today->add(new DateInterval('P1D'));
+                        }
+                        $this->weekday_html($today, $i==0);
+                    }
+                ?>
+            </ul>
+        </div>
+    <?php
     }
 
     /**
@@ -457,42 +455,39 @@ class NGRoster extends Roster { // NGRoster
      * @param Boolean $open
      * @return string
      */
-    protected function get_weekday_html ($today, $open) {
+    protected function weekday_html ($today, $open) {
         $title = $today->format("l (j/M/Y)");
         $day_of_week = $today->format("N");
         $cat = $this->weekdays[$day_of_week - 1];
-        $html = [
-            '<li class="control-section accordion-section '
-              . ($open ? 'open' : '')
-              . '" id="' . $today->getTimestamp() . '">',
-            '  <h3 class="accordion-section-title hndle" tabindex="0" title="' . $title . '">',
-            $title,
-            '  </h3>',
-            '  <div class="accordion-section-content">',
-            '    <div class="inside">',
-            '      <article>',
-            '        <div class="filter">',
-            '          <input type="text" data-edik-elem="search" class="search" />',
-            '        </div>',
-            '        <div data-edik-elem="people-grid">'
-        ];
-
-        $html[] = $this->get_people_html($cat);
-
-        return implode("\n", array_merge($html, [
-            '</div>', '</article>', '</div>', '</div>', '</li>'
-        ]));
+    ?>
+        <li class="control-section accordion-section <?= $open ? 'open' : '' ?>"
+            id="<?= $today->getTimestamp() ?>">
+            <h3 class="accordion-section-title hndle" tabindex="0" title="<?= $title ?>">
+                <?= $title ?>
+            </h3>
+            <div class="accordion-section-content">
+                <div class="inside">
+                    <article>
+                        <div class="filter">
+                            <input type="text" data-edik-elem="search" class="search" />
+                        </div>
+                        <div data-edik-elem="people-grid">
+                            <?php $this->people_html($cat); ?>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </li>
+    <?php
     }
 
-    protected function get_people_html($cat) {
-        $html = [];
+    protected function people_html($cat) {
         foreach ($this->people as $p) {
             /**
              * @var NGPerson $p
              */
-            $html[] = $p->get_html($cat);
+            $p->html($cat);
         }
-        return implode("\n", $html);
     }
 
     public function save($roster) {
@@ -526,6 +521,109 @@ class NGRoster extends Roster { // NGRoster
         $wpdb->query('COMMIT');
     }
 
+}
+
+
+class WidgetPerson extends NGPerson {
+
+    private function is_checked($cat) {
+        global $week_mapping;
+        $today = new DateTime();
+        $date_str = $today->format('Y-m-d');
+        global $wpdb;
+        $table = $wpdb->prefix . 'ngroster';
+        $pid = $this->reference->ID;
+        $results = $wpdb->get_results(
+            "
+            SELECT roster_date, working
+            FROM $table
+            WHERE pid=$pid
+            AND roster_date >= '$date_str'
+            "
+        );
+
+        foreach ($results as $r) {
+            $w = DateTime::createFromFormat('Y-m-d', $r->roster_date)->format('N') - 1;
+            if ($w == $week_mapping[strtoupper($cat->cat_name)]) {
+                return boolval($r->working);
+            }
+        }
+        return in_array($cat->term_id, $this->categories);
+    }
+
+    public function html($cat) {
+        $is_checked = $this->is_checked($cat);
+        if (!$is_checked) {
+            return;
+        }
+        $thumbnail_id = get_post_thumbnail_id($this->reference->ID);
+        $thumbnail_url = wp_get_attachment_url($thumbnail_id);
+        $id = $this->reference->ID;
+        $title = strtoupper($this->reference->post_title);
+        if (!$thumbnail_url) {
+            $thumbnail_url = plugins_url('assets/images/no_photo.jpg', __FILE__);
+        }
+        ?>
+        <div class="person-grid" data-edik-elem="<?= $id . ':' . esc_attr($title) ?>" data-edik-elem-type="people">
+            <img data-edik-elem="overlay" class="overlay"
+                 src="<?= plugins_url('assets/images/on.png', __FILE__) ?>" />
+            <img data-edik-elem="gthumb" class="gthumb"
+                 src="<?= $thumbnail_url ?>">
+            <div data-edik-elem="name" class="name" >
+                <h4><?= $this->reference->post_title ?></h4>
+            </div>
+        </div>
+        <?php
+    }
+}
+
+
+class WidgetRoster extends NGRoster {
+    public function html() {
+        ?>
+        <div id="side-sortables" class="accordion-container">
+            <ul class="outer-border">
+                <?php
+                $today = new DateTime();
+                for ($i = 0; $i < self::NUMBER_OF_DAYS; $i += 1) {
+                    if ($i != 0) {
+                        $today->add(new DateInterval('P1D'));
+                    }
+                    $this->weekday_html($today, $i==0);
+                }
+                ?>
+            </ul>
+        </div>
+        <?php
+    }
+
+    /**
+     * @param DateTime $today
+     * @param Boolean $open
+     * @return string
+     */
+    protected function weekday_html ($today, $open) {
+        $title = $today->format("l (j/M/Y)");
+        $day_of_week = $today->format("N");
+        $cat = $this->weekdays[$day_of_week - 1];
+        ?>
+        <li class="control-section accordion-section <?= $open ? 'open' : '' ?>"
+            id="<?= $today->getTimestamp() ?>">
+            <h3 class="accordion-section-title hndle" tabindex="0" title="<?= $title ?>">
+                <?= $title ?>
+            </h3>
+            <div class="accordion-section-content">
+                <div class="inside">
+                    <article>
+                        <div data-edik-elem="people-grid">
+                            <?php $this->people_html($cat); ?>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </li>
+        <?php
+    }
 }
 
 
