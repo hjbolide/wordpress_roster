@@ -17,7 +17,7 @@ class RosterWidget extends WP_Widget {
     protected function get_weekdays ($instance) {
         global $week_mapping;
         $weekdays_cat = get_category_by_path(
-            isset($instance['weekday_category']) ? $instance['weekday_category'] : 'weekdays');
+            isset($instance['weekday_category']) ? $instance['weekday_category'] : 'timetable');
         $weekdays = array_map(
             function ($t) {
                 return get_category($t);
@@ -60,7 +60,6 @@ class RosterWidget extends WP_Widget {
         echo $args['before_widget'];
         $roster = new WidgetRoster($this->get_weekdays($instance), $this->get_people($instance));
         $roster->html();
-        echo __( 'Hello, World!', 'text_domain' );
         echo $args['after_widget'];
     }
 

@@ -48,7 +48,7 @@ class Person {
         $this->categories = wp_get_post_categories($this->reference->ID);
     }
 
-    public function html ($weekdays) {
+    public function html ($weekdays, $index=0) {
     ?>
         <tr>
             <?php $this->entity_cell_html(); ?>
@@ -375,7 +375,7 @@ class NGWeekday { // NGWeekday
 
 class NGPerson extends Person {
 
-    private function is_checked($cat) {
+    public function is_checked($cat) {
         global $week_mapping;
         $today = new DateTime();
         $date_str = $today->format('Y-m-d');
@@ -400,14 +400,16 @@ class NGPerson extends Person {
         return in_array($cat->term_id, $this->categories);
     }
 
-    public function html($cat) {
+    public function html($cat, $index=0) {
         $is_checked = $this->is_checked($cat);
         $thumbnail_id = get_post_thumbnail_id($this->reference->ID);
-        $thumbnail_url = wp_get_attachment_url($thumbnail_id);
+        $thumbnail_url = wp_get_attachment_image_src($thumbnail_id, 'thumbnail');
         $id = $this->reference->ID;
         $title = strtoupper($this->reference->post_title);
         if (!$thumbnail_url) {
             $thumbnail_url = plugins_url('assets/images/no_photo.jpg', __FILE__);
+        } else {
+            $thumbnail_url = $thumbnail_url[0];
         }
     ?>
         <div class="person-grid" data-edik-elem="<?= $id . ':' . esc_attr($title) ?>" data-edik-elem-type="people">
@@ -526,53 +528,43 @@ class NGRoster extends Roster { // NGRoster
 
 class WidgetPerson extends NGPerson {
 
-    private function is_checked($cat) {
-        global $week_mapping;
-        $today = new DateTime();
-        $date_str = $today->format('Y-m-d');
-        global $wpdb;
-        $table = $wpdb->prefix . 'ngroster';
-        $pid = $this->reference->ID;
-        $results = $wpdb->get_results(
-            "
-            SELECT roster_date, working
-            FROM $table
-            WHERE pid=$pid
-            AND roster_date >= '$date_str'
-            "
-        );
-
-        foreach ($results as $r) {
-            $w = DateTime::createFromFormat('Y-m-d', $r->roster_date)->format('N') - 1;
-            if ($w == $week_mapping[strtoupper($cat->cat_name)]) {
-                return boolval($r->working);
-            }
-        }
-        return in_array($cat->term_id, $this->categories);
-    }
-
-    public function html($cat) {
+    public function html($cat, $index=0) {
         $is_checked = $this->is_checked($cat);
         if (!$is_checked) {
             return;
         }
         $thumbnail_id = get_post_thumbnail_id($this->reference->ID);
-        $thumbnail_url = wp_get_attachment_url($thumbnail_id);
+        $thumbnail_url = wp_get_attachment_image_src($thumbnail_id, 'thumbnail');
         $id = $this->reference->ID;
         $title = strtoupper($this->reference->post_title);
         if (!$thumbnail_url) {
             $thumbnail_url = plugins_url('assets/images/no_photo.jpg', __FILE__);
+        } else {
+            $thumbnail_url = $thumbnail_url[0];
         }
+        $post_url = get_permalink($id);
         ?>
-        <div class="person-grid" data-edik-elem="<?= $id . ':' . esc_attr($title) ?>" data-edik-elem-type="people">
-            <img data-edik-elem="overlay" class="overlay"
-                 src="<?= plugins_url('assets/images/on.png', __FILE__) ?>" />
-            <img data-edik-elem="gthumb" class="gthumb"
-                 src="<?= $thumbnail_url ?>">
-            <div data-edik-elem="name" class="name" >
-                <h4><?= $this->reference->post_title ?></h4>
+        <article class="slide-entry flex_column post-entry post-entry-<?= $id ?> slide-entry-overview
+                        slide-loop-<?= $index ?>
+                        slide-parity-<?= ($index + 1) % 2 == 0 ? 'even' : 'odd' ?>
+                        av_one_fifth <?= $index % 5 == 0 ? 'first' : '' ?> fake-thumbnail"
+                 itemscope="itemscope" itemtype="https://schema.org/BlogPosting" itemprop="blogPost">
+            <a href="<?= $post_url ?>" data-rel="slide-1" class="slide-image" title="">
+                <img width="300" height="420" src="<?= $thumbnail_url ?>"
+                     class="attachment-portfolio wp-post-image" alt="image">
+                <span class="image-overlay overlay-type-extern">
+                    <span class="image-overlay-inside"></span>
+                </span>
+            </a>
+            <div class="slide-content">
+                <header class="entry-content-header">
+                    <h3 class="slide-entry-title entry-title" itemprop="headline">
+                        <a href="<?= $post_url ?>" title="<?= $title ?>"><?= $title?></a>
+                    </h3>
+                </header>
             </div>
-        </div>
+            <footer class="entry-footer"></footer>
+        </article>
         <?php
     }
 }
@@ -597,6 +589,37 @@ class WidgetRoster extends NGRoster {
         <?php
     }
 
+    protected function people_html($cat) {
+        $index = 0;
+        $need_to_close = false;
+        foreach ($this->people as $p) {
+            /**
+             * @var WidgetPerson $p
+             */
+            if (!$p->is_checked($cat)) {
+                continue;
+            }
+            if ($index % 5 == 0) {
+            ?>
+                <div class="slide-entry-wrap">
+            <?php
+                $need_to_close = true;
+            }
+            $p->html($cat, $index++);
+            if ($index % 5 == 0 && $index != 0) {
+            ?>
+                </div>
+            <?php
+                $need_to_close = false;
+            }
+        }
+        if ($need_to_close) {
+        ?>
+            </div>
+        <?php
+        }
+    }
+
     /**
      * @param DateTime $today
      * @param Boolean $open
@@ -606,23 +629,27 @@ class WidgetRoster extends NGRoster {
         $title = $today->format("l (j/M/Y)");
         $day_of_week = $today->format("N");
         $cat = $this->weekdays[$day_of_week - 1];
-        ?>
-        <li class="control-section accordion-section <?= $open ? 'open' : '' ?>"
-            id="<?= $today->getTimestamp() ?>">
-            <h3 class="accordion-section-title hndle" tabindex="0" title="<?= $title ?>">
-                <?= $title ?>
-            </h3>
-            <div class="accordion-section-content">
-                <div class="inside">
-                    <article>
-                        <div data-edik-elem="people-grid">
-                            <?php $this->people_html($cat); ?>
-                        </div>
-                    </article>
+    ?>
+        <div class="flex_column av_one_full first avia-builder-el-3  el_after_av_one_full
+                    el_before_av_one_full  column-top-margin">
+            <section class="av_textblock_section" itemscope="itemscope"
+                     itemtype="https://schema.org/CreativeWork">
+                <div class="avia_textblock " itemprop="text">
+                    <h3 style="text-align: left; color: #fff; background: rgba(0,0,0,0.7); padding: 8px 0 8px 15px;border-radius: 8px;">
+                        <?= $title ?>
+                    </h3>
+                </div>
+            </section>
+            <div data-autoplay="" data-interval="5" data-animation="fade" data-show_slide_delay="90"
+                 class="avia-content-slider avia-content-grid-active avia-content-slider1 avia-content-slider-odd
+                        avia-builder-el-5  el_after_av_textblock  avia-builder-el-last " itemscope="itemscope"
+                 itemtype="https://schema.org/Blog">
+                <div class="avia-content-slider-inner">
+                    <?php $this->people_html($cat); ?>
                 </div>
             </div>
-        </li>
-        <?php
+        </div>
+    <?php
     }
 }
 
